@@ -4,6 +4,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Block World Platform</title>
+<!-- ════════════════════════════════════════════════════════
+     FIREBASE REALTIME DATABASE — CROSS-DEVICE REAL-TIME SYNC
+     ════════════════════════════════════════════════════════
+     HOW TO SET UP (one-time, free):
+     1. Go to https://console.firebase.google.com
+     2. Create a project → Add a web app → copy the config below
+     3. In Firebase console → Build → Realtime Database → Create database
+     4. Set rules to:
+        { "rules": { ".read": true, ".write": true } }
+        (for a classroom / trusted-users setup)
+     5. Replace the firebaseConfig values below with yours
+     ════════════════════════════════════════════════════════ -->
+<script type="module">
+  // ──────────────────────────────────────────────
+  // PASTE YOUR FIREBASE CONFIG HERE ↓
+  // ──────────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "AIzaSyC4hKOwpA9kn4JwpQlxTmPt6ZkQZ2ZLcaI",
+    authDomain:        "block-world-project.firebaseapp.com",
+    databaseURL:       "https://block-world-project-default-rtdb.firebaseio.com",
+    projectId:         "block-world-project",
+    storageBucket:     "block-world-project.firebasestorage.app",
+    messagingSenderId: "591454777970",
+    appId:             "1:591454777970:web:62f01ea494747e2a3788eb",
+    measurementId:     "G-W0LX6643J6"
+  };
+  // ──────────────────────────────────────────────
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue, update, remove, push }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // Expose Firebase helpers to global scope so non-module scripts can use them
+  window._fb = { db, ref, set, get, onValue, update, remove, push };
+  window._fbReady = true;
+  document.dispatchEvent(new Event('firebase-ready'));
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -676,16 +716,185 @@ const FAKE_NAMES=['Alice K.','Bob M.','Carol T.','David L.','Emma R.','Farhan S.
 // ── STATE ──
 let S={
   currentUser:null,loginRole:'organizer',signupRole:'student',
-  students:JSON.parse(localStorage.getItem('bw_students')||'[]'),
-  pendingOrgs:JSON.parse(localStorage.getItem('bw_pending')||'[]'),
-  competitions:JSON.parse(localStorage.getItem('bw_comps')||'[]'),
+  students:[],
+  pendingOrgs:[],
+  competitions:[],
   completedLessons:new Set(JSON.parse(localStorage.getItem('bw_done')||'[]')),
-  allScores:JSON.parse(localStorage.getItem('bw_scores')||'[]'),
+  allScores:[],
   currentLessonIdx:0,moves:[],compSeconds:0,compTimer:null,
   activePuzzle:null,fakeLeaderboard:[],fakeTimerIds:[],
   quizAnswers:[],quizScore:0,notifications:[],
-  rtInterval:null, // real-time polling interval
+  rtInterval:null,
+  _rtUnsubs:[], // Firebase listener unsubscribe fns
+  _fbOk:false,  // true once Firebase is confirmed working
 };
+
+// ── FIREBASE HELPERS ──
+function fb(){return window._fb;}
+
+// Write a full collection to Firebase
+async function fbSet(path, data){
+  if(!window._fbReady)return;
+  const {db,ref,set}=fb();
+  await set(ref(db,path), data);
+}
+
+// Read once
+async function fbGet(path){
+  if(!window._fbReady)return null;
+  const {db,ref,get}=fb();
+  const snap=await get(ref(db,path));
+  return snap.exists()?snap.val():null;
+}
+
+// Listen realtime; returns unsubscribe fn
+function fbListen(path, cb){
+  if(!window._fbReady)return ()=>{};
+  const {db,ref,onValue}=fb();
+  const r=ref(db,path);
+  const unsub=onValue(r, snap=>{
+    cb(snap.exists()?snap.val():null);
+  });
+  return unsub;
+}
+
+// ── FIREBASE SETUP CHECK ──
+function fbConfigured(){
+  if(!window._fbReady)return false;
+  try{
+    const cfg=window._fb.db.app.options;
+    return cfg.apiKey && !cfg.apiKey.includes('PASTE_YOUR');
+  }catch(e){return false;}
+}
+
+// ── LOAD DATA FROM FIREBASE (called once on page ready) ──
+async function loadFromFirebase(){
+  if(!fbConfigured()){
+    // Fall back to localStorage demo mode
+    S.students=JSON.parse(localStorage.getItem('bw_students')||'[]');
+    S.pendingOrgs=JSON.parse(localStorage.getItem('bw_pending')||'[]');
+    S.competitions=JSON.parse(localStorage.getItem('bw_comps')||'[]');
+    S.allScores=JSON.parse(localStorage.getItem('bw_scores')||'[]');
+    seedDemoData();
+    showFbWarning();
+    return;
+  }
+  S._fbOk=true;
+  try{
+    const [stu,pend,comps,scores]=await Promise.all([
+      fbGet('students'), fbGet('pendingOrgs'), fbGet('competitions'), fbGet('allScores')
+    ]);
+    S.students  = stu    ? Object.values(stu)   : [];
+    S.pendingOrgs= pend  ? Object.values(pend)  : [];
+    S.competitions= comps? Object.values(comps) : [];
+    S.allScores  = scores? Object.values(scores): [];
+    if(!S.students.length && !S.allScores.length) seedDemoData();
+  }catch(e){
+    console.error('Firebase load error',e);
+    showFbWarning();
+  }
+  // Start real-time listeners for live data
+  startGlobalListeners();
+}
+
+// ── GLOBAL REALTIME LISTENERS ──
+// These keep organizer dashboard & student competition views in sync across devices
+function startGlobalListeners(){
+  if(!S._fbOk)return;
+  stopGlobalListeners();
+
+  const unsubStudents=fbListen('students', val=>{
+    S.students=val?Object.values(val):[];
+    if(S.currentUser?.role==='organizer' && document.getElementById('s-org').classList.contains('active'))renderOrgDash();
+  });
+  const unsubComps=fbListen('competitions', val=>{
+    S.competitions=val?Object.values(val):[];
+    if(S.currentUser?.role==='organizer' && document.getElementById('s-org').classList.contains('active'))renderOrgDash();
+  });
+  const unsubScores=fbListen('allScores', val=>{
+    S.allScores=val?Object.values(val):[];
+    if(S.currentUser?.role==='organizer' && document.getElementById('s-org').classList.contains('active'))renderTopScorers();
+  });
+  const unsubPending=fbListen('pendingOrgs', val=>{
+    S.pendingOrgs=val?Object.values(val):[];
+    if(S.currentUser?.role==='organizer' && document.getElementById('s-org').classList.contains('active'))renderOrgDash();
+  });
+
+  S._rtUnsubs=[unsubStudents,unsubComps,unsubScores,unsubPending];
+}
+function stopGlobalListeners(){
+  S._rtUnsubs.forEach(fn=>{ try{fn();}catch(e){} });
+  S._rtUnsubs=[];
+}
+
+// ── SAVE helpers — write to Firebase (+ localStorage fallback) ──
+async function save(){
+  // Always keep localStorage for quick reload / offline cache
+  localStorage.setItem('bw_students',JSON.stringify(S.students));
+  localStorage.setItem('bw_pending',JSON.stringify(S.pendingOrgs));
+  localStorage.setItem('bw_comps',JSON.stringify(S.competitions));
+  localStorage.setItem('bw_scores',JSON.stringify(S.allScores));
+
+  if(!S._fbOk)return;
+  // Convert arrays to keyed objects for Firebase (needed for onValue listeners)
+  const toObj=(arr,key='email')=>arr.reduce((o,x)=>{o[encodeKey(x[key]||x.id||Math.random().toString(36).slice(2))]=x;return o;},{});
+  try{
+    await Promise.all([
+      fbSet('students',   toObj(S.students,'email')),
+      fbSet('pendingOrgs',toObj(S.pendingOrgs,'email')),
+      fbSet('competitions',toObj(S.competitions,'id')),
+      fbSet('allScores',  toObj(S.allScores.slice(0,50),'name')),
+    ]);
+  }catch(e){ console.error('Firebase save error',e); }
+}
+
+// Firebase keys cannot contain . # $ / [ ]
+function encodeKey(k){ return String(k).replace(/[.#$\/\[\]]/g,'_'); }
+
+// ── COMPETITION REAL-TIME LEADERBOARD (students submit → organizer + others see live) ──
+async function fbSubmitScore(entry){
+  if(!S._fbOk)return;
+  const {db,ref,set}=fb();
+  const key=encodeKey((entry.compId||'default')+'_'+encodeKey(entry.name));
+  await set(ref(db,'liveScores/'+key), {...entry, ts:Date.now()});
+}
+
+function listenLiveScores(compId, cb){
+  if(!S._fbOk)return ()=>{};
+  return fbListen('liveScores', val=>{
+    if(!val){cb([]);return;}
+    const rows=Object.values(val).filter(x=>x.compId===compId);
+    cb(rows);
+  });
+}
+
+// ── SEED DEMO DATA ──
+function seedDemoData(){
+  if(!S.students.length){
+    S.students=[{name:'Demo Student',email:'student@demo.com',password:'demo1234',role:'student',approved:true,dept:'Computer Science',sid:''}];
+  }
+  if(!S.allScores.length){
+    S.allScores=[
+      {name:'Alice K.',score:287,moves:3,time:38,diff:'easy'},
+      {name:'Demo Student',score:245,moves:6,time:52,diff:'medium'},
+      {name:'Bob M.',score:232,moves:7,time:61,diff:'medium'},
+      {name:'Carol T.',score:198,moves:9,time:75,diff:'hard'},
+      {name:'David L.',score:180,moves:10,time:88,diff:'medium'},
+    ];
+  }
+  save();
+}
+
+// ── FIREBASE NOT CONFIGURED WARNING ──
+function showFbWarning(){
+  // Only show once
+  if(document.getElementById('fb-warn'))return;
+  const d=document.createElement('div');
+  d.id='fb-warn';
+  d.style.cssText='position:fixed;bottom:80px;right:22px;background:#f59e0b10;border:1px solid #f59e0b50;border-radius:12px;padding:13px 16px;font-size:12px;color:#f59e0b;max-width:290px;z-index:9998;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+  d.innerHTML='⚠️ <strong>Running in local-only mode.</strong><br>Cross-device sync is OFF. Add your Firebase config in the &lt;script&gt; at the top of the HTML to enable real-time sync across all devices. <span onclick="this.parentElement.remove()" style="cursor:pointer;float:right;opacity:.6">✕</span>';
+  document.body.appendChild(d);
+}
 
 // ── THEME ──
 function toggleTheme(){
@@ -703,13 +912,7 @@ function toggleTheme(){
   });
 })();
 
-// ── SAVE ──
-function save(){
-  localStorage.setItem('bw_students',JSON.stringify(S.students));
-  localStorage.setItem('bw_pending',JSON.stringify(S.pendingOrgs));
-  localStorage.setItem('bw_comps',JSON.stringify(S.competitions));
-  localStorage.setItem('bw_scores',JSON.stringify(S.allScores));
-}
+// ── (save function now defined above with Firebase layer) ──
 
 // ── SCREEN ──
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
@@ -750,49 +953,72 @@ document.addEventListener('click',e=>{
   if(p&&b&&!p.contains(e.target)&&!b.contains(e.target)){p.classList.remove('open');}
 });
 
-// ── DEMO SEED ──
-if(!S.students.length){
-  S.students=[{name:'Demo Student',email:'student@demo.com',password:'demo1234',role:'student',approved:true,dept:'Computer Science',sid:''}];
-  save();
+// ── INIT — wait for Firebase then load data ──
+function initApp(){
+  if(window._fbReady){
+    loadFromFirebase();
+  } else {
+    // Firebase module not yet ready — wait for it
+    document.addEventListener('firebase-ready', ()=>loadFromFirebase(), {once:true});
+    // Timeout fallback: if Firebase script fails (e.g. bad config), run in local mode
+    setTimeout(()=>{ if(!S.students.length){ S._fbOk=false; seedDemoData(); showFbWarning(); } }, 4000);
+  }
 }
-if(!S.allScores.length){
-  S.allScores=[
-    {name:'Alice K.',score:287,moves:3,time:38,diff:'easy'},
-    {name:'Demo Student',score:245,moves:6,time:52,diff:'medium'},
-    {name:'Bob M.',score:232,moves:7,time:61,diff:'medium'},
-    {name:'Carol T.',score:198,moves:9,time:75,diff:'hard'},
-    {name:'David L.',score:180,moves:10,time:88,diff:'medium'},
-  ];
-  save();
-}
+document.addEventListener('DOMContentLoaded', initApp);
 
-// ── REAL-TIME POLLING SIMULATION ──
-// In a real backend this would use WebSockets (e.g. Socket.io, Supabase Realtime)
-// Here we simulate real-time updates by polling every 3s for leaderboard changes
+// ── REAL-TIME COMPETITION LEADERBOARD ──
+// Now uses Firebase Realtime Database — submissions from any device appear instantly
+let _liveScoreUnsub = null;
+
 function startRealTimeSync(){
   stopRealTimeSync();
-  S.rtInterval=setInterval(()=>{
-    // Simulate receiving an update from the "server"
-    if(Math.random()<0.3 && S.fakeLeaderboard.some(x=>!x.submitted)){
-      // A player just submitted
-      const pending=S.fakeLeaderboard.filter(x=>!x.submitted);
-      if(pending.length){
-        const p=pending[Math.floor(Math.random()*pending.length)];
-        const opt=S.activePuzzle?.optimalMoves||5;
-        p.submitted=true;
-        p.time=Math.floor(S.compSeconds+10+Math.random()*30);
-        p.moves=opt+Math.floor(Math.random()*5);
-        p.score=calcScore(p.time,p.moves,opt);
-        renderLeaderboard();
-        showToast(`📡 ${p.name} submitted!`,'');
-        addNotif('📡',`${p.name} submitted their solution`);
-        updateNotifBadge();
-        updateCompQuickStats();
+  const live = S.competitions.find(c=>c.status==='live');
+  const compId = live ? live.id : 'default';
+
+  if(S._fbOk){
+    // Real Firebase listener — updates leaderboard the instant anyone submits
+    _liveScoreUnsub = listenLiveScores(compId, rows=>{
+      // Merge real submissions into leaderboard display
+      rows.forEach(r=>{
+        const existing = S.fakeLeaderboard.find(x=>x.name===r.name);
+        if(existing){
+          existing.submitted=true;existing.score=r.score;existing.moves=r.moves;existing.time=r.time;
+        } else if(r.name !== (S.currentUser?.name||'You')){
+          S.fakeLeaderboard.push({name:r.name,score:r.score,moves:r.moves,time:r.time,submitted:true});
+        }
+      });
+      renderLeaderboard();
+      updateCompQuickStats();
+      if(rows.length > 0){
+        const latest = rows.sort((a,b)=>b.ts-a.ts)[0];
+        if(latest && Date.now()-latest.ts < 6000){
+          showToast(`📡 ${latest.name} submitted!`,'');
+          addNotif('📡',`${latest.name} submitted their solution`);
+          updateNotifBadge();
+        }
       }
-    }
-  },3000);
+    });
+  } else {
+    // Fallback: simulated updates (local-only mode)
+    S.rtInterval=setInterval(()=>{
+      if(Math.random()<0.3 && S.fakeLeaderboard.some(x=>!x.submitted)){
+        const pending=S.fakeLeaderboard.filter(x=>!x.submitted);
+        if(pending.length){
+          const p=pending[Math.floor(Math.random()*pending.length)];
+          const opt=S.activePuzzle?.optimalMoves||5;
+          p.submitted=true;p.time=Math.floor(S.compSeconds+10+Math.random()*30);
+          p.moves=opt+Math.floor(Math.random()*5);p.score=calcScore(p.time,p.moves,opt);
+          renderLeaderboard();showToast(`📡 ${p.name} submitted!`,'');
+          addNotif('📡',`${p.name} submitted their solution`);updateNotifBadge();updateCompQuickStats();
+        }
+      }
+    },3000);
+  }
 }
-function stopRealTimeSync(){if(S.rtInterval){clearInterval(S.rtInterval);S.rtInterval=null;}}
+function stopRealTimeSync(){
+  if(_liveScoreUnsub){try{_liveScoreUnsub();}catch(e){}  _liveScoreUnsub=null;}
+  if(S.rtInterval){clearInterval(S.rtInterval);S.rtInterval=null;}
+}
 function updateCompQuickStats(){
   const submitted=S.fakeLeaderboard.filter(x=>x.submitted).length;
   const el1=document.getElementById('cq-players');
@@ -1015,9 +1241,23 @@ function createComp(){
 }
 function toggleComp(id){
   const c=S.competitions.find(x=>x.id===id);if(!c)return;
-  c.status=c.status==='live'?'scheduled':'live';save();renderOrgDash();
+  c.status=c.status==='live'?'scheduled':'live';
+  save();renderOrgDash();
   showToast(c.status==='live'?`"${c.name}" is LIVE! Students can now join.`:`"${c.name}" stopped`,'success');
-  addNotif(c.status==='live'?'🔴':'⏹',`"${c.name}" ${c.status==='live'?'started':'stopped'}`);updateNotifBadge();
+  addNotif(c.status==='live'?'🔴':'⏹',`"${c.name}" ${c.status==='live'?'started':'stopped'}`);
+  updateNotifBadge();
+  // Start/stop live score listener for organizer view
+  if(c.status==='live' && S._fbOk){
+    if(window._orgLiveUnsub){try{window._orgLiveUnsub();}catch(e){}}
+    window._orgLiveUnsub = listenLiveScores(id, rows=>{
+      S.allScores = [...rows, ...S.allScores.filter(x=>!rows.find(r=>r.name===x.name))]
+        .sort((a,b)=>b.score-a.score).slice(0,50);
+      if(document.getElementById('s-org').classList.contains('active'))renderTopScorers();
+    });
+  } else if(c.status!=='live' && window._orgLiveUnsub){
+    try{window._orgLiveUnsub();}catch(e){}
+    window._orgLiveUnsub=null;
+  }
 }
 function deleteComp(id){
   const c=S.competitions.find(x=>x.id===id);
@@ -1279,10 +1519,19 @@ function submitSolution(){
   const myScore=calcScore(S.compSeconds,S.moves.length,opt);
   const acc=S.moves.length<=opt?100:Math.round((opt/S.moves.length)*100);
   document.getElementById('my-acc').textContent=acc+'%';
+  const live=S.competitions.find(c=>c.status==='live');
+  const compId=live?live.id:'default';
+  const entry={
+    name:S.currentUser?.name||'You',score:myScore,moves:S.moves.length,
+    time:S.compSeconds,diff:Object.keys(PUZZLES).find(k=>PUZZLES[k]===S.activePuzzle)||'medium',
+    compId
+  };
   // Save to all-time scores
-  S.allScores.push({name:S.currentUser?.name||'You',score:myScore,moves:S.moves.length,time:S.compSeconds,diff:Object.keys(PUZZLES).find(k=>PUZZLES[k]===S.activePuzzle)||'medium'});
+  S.allScores.push(entry);
   S.allScores.sort((a,b)=>b.score-a.score);
   if(S.allScores.length>50)S.allScores=S.allScores.slice(0,50);
+  // Push to Firebase live leaderboard (visible to organizer + other students instantly)
+  fbSubmitScore(entry).catch(e=>console.warn('live score push failed',e));
   save();showResults(myScore,acc);
 }
 

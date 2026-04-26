@@ -483,6 +483,42 @@ body::before{
 .comp-tab{flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:var(--muted);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
 .comp-tab.active{background:var(--card);color:var(--text);box-shadow:var(--shadow-sm)}
 
+/* ─ COMP LEADERBOARD MODAL ─ */
+.modal-overlay{position:fixed;inset:0;background:rgba(6,8,15,.85);z-index:300;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);animation:overlayFade .25s ease}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:32px;width:540px;max-width:93vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow);position:relative;animation:slideUp .35s cubic-bezier(.34,1.56,.64,1)}
+.modal-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--accent),var(--accent2));border-radius:22px 22px 0 0}
+.modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+.clb-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:11px;margin-bottom:6px;background:var(--bg2);border:1px solid var(--border);animation:fadeInRow .3s ease both}
+.clb-row.clb-me{background:rgba(79,142,247,.09);border-color:rgba(79,142,247,.3)}
+.clb-rank-badge{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.clb-info{flex:1;min-width:0}
+.clb-name{font-size:13px;font-weight:700}
+.clb-dept{font-size:11px;color:var(--muted);margin-top:1px}
+.clb-score{font-family:var(--mono);font-size:14px;font-weight:800;color:var(--accent)}
+.clb-meta{font-size:11px;color:var(--muted);text-align:right}
+.clb-bar-wrap{width:80px;height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;margin-left:auto}
+.clb-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 1s ease}
+
+/* ─ PRACTICE PUZZLE BOX ─ */
+.practice-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:24px}
+.practice-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.practice-title{font-size:15px;font-weight:800}
+.practice-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(79,142,247,.12);color:var(--accent);font-weight:700}
+.practice-states{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;margin-bottom:14px;align-items:center}
+.practice-state{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px}
+.practice-state-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:10px}
+.practice-moves{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+.practice-moves-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.practice-move-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.practice-move-item:last-child{border-bottom:none}
+.practice-controls{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:10px;align-items:flex-end}
+.practice-result{padding:14px;border-radius:10px;text-align:center;font-weight:700;animation:fadeIn .4s ease}
+.practice-result.success{background:rgba(34,211,160,.08);border:1px solid rgba(34,211,160,.25);color:var(--green)}
+.practice-result.hint-shown{background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.18);color:var(--accent)}
+
 /* ─ SCROLLBARS ─ */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -525,6 +561,16 @@ body::before{
       <button class="comp-popup-btn" onclick="joinComp()">🚀 Join Now!</button>
       <button class="comp-popup-btn secondary" onclick="dismissPopup()">Later</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ COMPETITION LEADERBOARD MODAL (organizer) ═══ -->
+<div class="modal-overlay" id="comp-lb-modal" style="display:none">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeCompLbModal()">✕</button>
+    <div class="modal-title" id="clb-comp-name">Competition Rankings</div>
+    <div class="modal-sub" id="clb-comp-meta"></div>
+    <div id="clb-body"><div style="text-align:center;color:var(--muted);padding:24px;font-size:13px">No submissions yet for this competition.</div></div>
   </div>
 </div>
 
@@ -602,9 +648,11 @@ body::before{
         <div class="field">
           <label>Department / Class</label>
           <select id="su-dept">
-            <option value="">Select…</option>
-            <option>Computer Science</option><option>Artificial Intelligence</option>
-            <option>Data Science</option><option>Information Technology</option><option>Other</option>
+            <option value="">Select your department…</option>
+            <option value="NwC">Networking with Communication (NwC)</option>
+            <option value="Cintel">Computational Intelligence (Cintel)</option>
+            <option value="Ctech">Computational Technology (Ctech)</option>
+            <option value="DSBS">Data Science &amp; Business Systems (DSBS)</option>
           </select>
         </div>
       </div>
@@ -1179,6 +1227,7 @@ function renderOrgDash(){
       </div>
       <span class="tag ${c.status==='live'?'tag-on':'tag-off'}">${c.status==='live'?'🔴 LIVE':'Ready'}</span>
       <button class="btn-add" style="padding:6px 14px;font-size:11px" onclick="toggleComp('${c.id}')">${c.status==='live'?'⏹ Stop':'▶ Start'}</button>
+      <button class="btn-sm" style="padding:6px 12px;font-size:11px" onclick="openCompLb('${c.id}')">📊 Ranks</button>
       <button class="btn-danger" onclick="deleteComp('${c.id}')">Delete</button>
     </div>`).join(''):'<div style="color:var(--muted);font-size:12px;padding:12px 0">No competitions yet.</div>';
 
@@ -1296,10 +1345,12 @@ function logout(){S.currentUser=null;clearTimer();clearFakeTimers();stopRealTime
 const LESSONS=[
   {id:0,title:'What is Block World?',icon:'🏠',type:'info',blocks:['A','B','C'],content:'The Block World Problem is a classic AI planning puzzle. Rearrange colored blocks from an initial configuration into a goal state using a robotic arm. Only one block can be picked up at a time — this teaches BFS, A*, and planning algorithms!'},
   {id:1,title:'States & Rules',icon:'📋',type:'rules',content:'Every action has preconditions that must be satisfied before it can execute. Understanding these rules is key to solving any Block World puzzle.'},
-  {id:2,title:'Interactive Practice',icon:'🎮',type:'interactive',content:'Click blocks to select them, then use the action buttons below to practice PICKUP, PUTDOWN, STACK, and UNSTACK.'},
+  {id:2,title:'Interactive Practice',icon:'🎮',type:'interactive',content:'Click a block to select it (it will highlight), then press an action button. For STACK you need to be holding a block AND have another block selected as target.'},
   {id:3,title:'BFS Planning',icon:'🔍',type:'teach-anim',blocks:['A','B'],animType:'bfs',content:'Breadth-First Search explores states level-by-level and guarantees the minimum number of moves. Watch the robotic arm execute a BFS-optimal sequence step by step.'},
-  {id:4,title:'A* Search',icon:'⭐',type:'teach-anim',blocks:['A','B','C'],animType:'astar',content:'A* uses f(n) = g(n) + h(n) where h(n) = blocks not in goal position. It\'s faster than BFS on large problems because it prioritises promising paths.'},
-  {id:5,title:'Knowledge Quiz',icon:'❓',type:'quiz',content:'Answer 3 questions to complete the course and unlock Competition Mode!'},
+  {id:4,title:'BFS Practice Puzzle',icon:'🧩',type:'practice',diff:'easy',content:'Now you try! Solve this easy puzzle using BFS thinking — find the shortest move sequence. Initial: A on table, B on table. Goal: A on B.'},
+  {id:5,title:'A* Search',icon:'⭐',type:'teach-anim',blocks:['A','B','C'],animType:'astar',content:'A* uses f(n) = g(n) + h(n) where h(n) = blocks not in goal position. It\'s faster than BFS on large problems because it prioritises promising paths.'},
+  {id:6,title:'A* Practice Puzzle',icon:'🧩',type:'practice',diff:'medium',content:'Apply A* thinking! Plan ahead using h(n) = blocks out of place. Solve the 3-block puzzle: A on C on B → B on A.'},
+  {id:7,title:'Knowledge Quiz',icon:'❓',type:'quiz',content:'Answer 3 questions to complete the course and unlock Competition Mode!'},
 ];
 
 const QUIZ=[
@@ -1346,7 +1397,7 @@ function loadLesson(idx){
   } else if(l.type==='rules'){
     html+=`<div class="block-world"><div class="bw-label">Action Preconditions</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        ${[['🔵 PICKUP(X)','X on table, X clear, arm empty'],['🔴 PUTDOWN(X)','Arm holding X'],['🟢 STACK(X,Y)','Holding X, Y clear'],['🟡 UNSTACK(X,Y)','X on Y, X clear, arm empty']].map(([a,b])=>`
+        ${[['🔵 PICKUP(X)','X is on the table, X is clear (nothing on top), and the arm is empty.'],['🔴 PUTDOWN(X)','The arm is holding X. Places X onto the table.'],['🟢 STACK(X,Y)','The arm is holding X, and Y is clear (nothing on top of Y).'],['🟡 UNSTACK(X,Y)','X is directly on Y, X is clear, and the arm is empty.']].map(([a,b])=>`
         <div style="background:var(--bg3);border-radius:12px;padding:16px;border:1px solid var(--border);transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="font-size:14px;font-weight:700;margin-bottom:6px">${a}</div>
           <div style="font-size:12px;color:var(--muted);line-height:1.6">${b}</div>
@@ -1354,22 +1405,31 @@ function loadLesson(idx){
       </div></div>
       <div class="step-btns"><button class="btn-step" onclick="loadLesson(${idx-1})">← Prev</button><button class="btn-step primary" onclick="completeLesson(${idx})">Got It →</button></div>`;
   } else if(l.type==='interactive'){
-    html+=`<div class="block-world"><div class="bw-label">Interactive Simulation</div>
-      <div id="sim-info" style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:9px 13px;background:var(--bg3);border-radius:9px;font-family:var(--mono)">Select a block to begin</div>
-      <div class="bw-canvas" id="sim-canvas"></div>
+    html+=`<div class="block-world">
+      <div class="bw-label">Interactive Simulation — Click a block to select it, then press an action</div>
+      <div id="sim-info" style="font-size:12px;color:var(--accent);margin-bottom:12px;padding:10px 14px;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.18);border-radius:10px;font-family:var(--mono)">
+        👆 Click a block to select it (it highlights), then press PICKUP or UNSTACK below
+      </div>
+      <div id="sim-canvas" style="width:100%;height:180px;display:flex;align-items:flex-end;gap:20px;border-bottom:2px solid var(--border);margin-bottom:10px;justify-content:center;padding:0 20px;position:relative"></div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:6px" id="sim-goal-txt">🎯 Try: separate all blocks — put A, B, C each on the table</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      <button class="btn-step" onclick="simPickup()">🔵 PICKUP</button>
-      <button class="btn-step" onclick="simPutdown()">🔴 PUTDOWN</button>
-      <button class="btn-step" onclick="simStack()">🟢 STACK</button>
-      <button class="btn-step" onclick="simUnstack()">🟡 UNSTACK</button>
-      <button class="btn-step primary" onclick="initSim()">🔄 Reset</button>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Actions — how to use each</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        <button class="btn-step" onclick="simPickup()" style="text-align:left;display:flex;align-items:center;gap:8px;padding:12px 14px"><span style="font-size:18px">🔵</span><div><div style="font-weight:700;font-size:13px">PICKUP</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Select a block on the table → PICKUP</div></div></button>
+        <button class="btn-step" onclick="simPutdown()" style="text-align:left;display:flex;align-items:center;gap:8px;padding:12px 14px"><span style="font-size:18px">🔴</span><div><div style="font-weight:700;font-size:13px">PUTDOWN</div><div style="font-size:10px;color:var(--muted);margin-top:1px">While holding → PUTDOWN on table</div></div></button>
+        <button class="btn-step" onclick="simStack()" style="text-align:left;display:flex;align-items:center;gap:8px;padding:12px 14px"><span style="font-size:18px">🟢</span><div><div style="font-weight:700;font-size:13px">STACK</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Holding + select target block → STACK</div></div></button>
+        <button class="btn-step" onclick="simUnstack()" style="text-align:left;display:flex;align-items:center;gap:8px;padding:12px 14px"><span style="font-size:18px">🟡</span><div><div style="font-weight:700;font-size:13px">UNSTACK</div><div style="font-size:10px;color:var(--muted);margin-top:1px">Select top block of a stack → UNSTACK</div></div></button>
+      </div>
+      <button class="btn-step primary" onclick="initSim()" style="width:100%;margin-top:10px;text-align:center">🔄 Reset</button>
     </div>
     <div id="sim-log" style="background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:13px;font-size:12px;color:var(--muted);margin-bottom:18px;min-height:44px;font-family:var(--mono)">Action log appears here…</div>
     <div class="step-btns"><button class="btn-step" onclick="loadLesson(${idx-1})">← Prev</button><button class="btn-step primary" onclick="completeLesson(${idx})">Done →</button></div>`;
     setTimeout(initSim,50);
   } else if(l.type==='teach-anim'){
     html+=buildTeachAnim(l.animType,idx);
+  } else if(l.type==='practice'){
+    html+=buildPracticeLesson(l.diff,idx);
   } else if(l.type==='quiz'){
     S.quizAnswers=[];S.quizScore=0;
     html+=QUIZ.map((q,i)=>`
@@ -1382,11 +1442,10 @@ function loadLesson(idx){
       <div style="font-size:52px;margin-bottom:12px;animation:iconPulse 1s ease-in-out infinite">🎉</div>
       <div style="font-size:22px;font-weight:800;margin-bottom:8px">Quiz Complete!</div>
       <div id="qscore" style="color:var(--muted);font-size:14px;margin-bottom:20px"></div>
-      <button class="btn-step primary" onclick="completeLesson(5)">Enter Competition Hall 🏆</button>
+      <button class="btn-step primary" onclick="completeLesson(7)">Enter Competition Hall 🏆</button>
     </div>`;
   }
   m.innerHTML=html;renderLessonNav();
-  // Start teach animation after render
   if(l.type==='teach-anim'){setTimeout(()=>startTeachAnim(l.animType),100);}
 }
 
@@ -1535,29 +1594,262 @@ function answerQ(qi,oi){
   }
 }
 
-// ── SIMULATION ──
-let sim={pos:{A:{on:'table'},B:{on:'A'},C:{on:'B'}},holding:null,selected:null};
-function initSim(){sim={pos:{A:{on:'table'},B:{on:'A'},C:{on:'B'}},holding:null,selected:null};renderSim();}
+// ── SIMULATION (fully fixed) ──
+let sim={pos:{},holding:null,selected:null,blocks:[]};
+function initSim(){
+  sim={pos:{A:{on:'table'},B:{on:'A'},C:{on:'B'}},holding:null,selected:null,blocks:['A','B','C']};
+  renderSim();
+  simLogMsg('Initial state: C on B on A. Try to separate them!','info');
+}
 function buildSimCols(){
-  const blocks=['A','B','C'];const visited=new Set();
-  function getStack(b){if(visited.has(b))return[];visited.add(b);const above=blocks.filter(x=>sim.pos[x]?.on===b);return[...above.flatMap(getStack),b];}
-  return blocks.filter(b=>sim.pos[b]?.on==='table').map(b=>getStack(b));
+  const visited=new Set();
+  function getStack(b){
+    if(visited.has(b))return[];visited.add(b);
+    const above=sim.blocks.filter(x=>sim.pos[x]?.on===b);
+    return[...above.flatMap(getStack),b];
+  }
+  return sim.blocks.filter(b=>sim.pos[b]?.on==='table').map(b=>getStack(b));
 }
 function renderSim(){
   const c=document.getElementById('sim-canvas');if(!c)return;
   const cols=buildSimCols();
-  c.innerHTML=cols.map(col=>`<div style="display:flex;flex-direction:column-reverse;align-items:center;gap:6px;min-width:80px">
-    ${col.map(b=>`<div class="block ${sim.selected===b?'selected':''}" style="background:${COLORS[b]}22;color:${COLORS[b]};border-color:${COLORS[b]}${sim.selected===b?'':66}" onclick="simClick('${b}')">${b}${sim.holding===b?'✊':''}</div>`).join('')}
+  // Also show held block
+  let heldHTML='';
+  if(sim.holding){
+    heldHTML=`<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:10px;color:var(--accent);font-weight:700;font-family:var(--mono)">✊ holding</div>
+      <div class="block selected" style="background:${COLORS[sim.holding]}22;color:${COLORS[sim.holding]};border-color:${COLORS[sim.holding]};box-shadow:0 0 20px ${COLORS[sim.holding]}44">${sim.holding}</div>
+    </div>`;
+  }
+  const colsHTML=cols.map(col=>`<div style="display:flex;flex-direction:column-reverse;align-items:center;gap:6px;min-width:80px">
+    ${col.map(b=>`<div class="block ${sim.selected===b?'selected':''}" style="background:${COLORS[b]}22;color:${COLORS[b]};border-color:${COLORS[b]}${sim.selected===b?'':55};cursor:pointer" onclick="simClick('${b}')">${b}</div>`).join('')}
   </div>`).join('');
+  c.innerHTML=heldHTML+colsHTML;
   const info=document.getElementById('sim-info');
-  if(info)info.textContent=`Holding: ${sim.holding||'nothing'} | Selected: ${sim.selected||'none'}`;
+  if(info){
+    if(sim.holding)info.innerHTML=`✊ <strong>Holding: ${sim.holding}</strong> — now select a target block and press STACK, or press PUTDOWN`;
+    else if(sim.selected)info.innerHTML=`👆 <strong>Selected: ${sim.selected}</strong> — press PICKUP (if on table) or UNSTACK (if on another block)`;
+    else info.innerHTML=`👆 Click a block to select it, then press PICKUP or UNSTACK below`;
+  }
 }
-function simClick(b){sim.selected=sim.selected===b?null:b;renderSim();}
-function simLog(msg){const l=document.getElementById('sim-log');if(l)l.innerHTML='▶ '+msg;}
-function simPickup(){if(!sim.selected){simLog('Select a block first');return;}if(sim.holding){simLog(`Already holding ${sim.holding}`);return;}const b=sim.selected;if(sim.pos[b].on!=='table'){simLog(`${b} is not on the table`);return;}if(['A','B','C'].some(x=>sim.pos[x]?.on===b)){simLog(`${b} is not clear`);return;}sim.holding=b;sim.pos[b]={on:'held'};sim.selected=null;simLog(`✅ PICKUP(${b}) — Success`);renderSim();}
-function simPutdown(){if(!sim.holding){simLog('Not holding anything');return;}const b=sim.holding;sim.pos[b]={on:'table'};sim.holding=null;simLog(`✅ PUTDOWN(${b}) — Success`);renderSim();}
-function simStack(){if(!sim.holding){simLog('Must be holding a block');return;}const b=sim.holding,t=sim.selected;if(!t||t===b){simLog('Select a target block');return;}if(['A','B','C'].some(x=>sim.pos[x]?.on===t)){simLog(`${t} is not clear`);return;}sim.pos[b]={on:t};sim.holding=null;sim.selected=null;simLog(`✅ STACK(${b},${t}) — Success`);renderSim();}
-function simUnstack(){if(sim.holding){simLog(`Already holding ${sim.holding}`);return;}const b=sim.selected;if(!b){simLog('Select a block to unstack');return;}const on=sim.pos[b]?.on;if(!on||on==='table'||on==='held'){simLog(`${b} is not on another block`);return;}if(['A','B','C'].some(x=>sim.pos[x]?.on===b)){simLog(`${b} is not clear`);return;}sim.holding=b;sim.pos[b]={on:'held'};sim.selected=null;simLog(`✅ UNSTACK(${b},${on}) — Success`);renderSim();}
+function simClick(b){
+  // If holding and click a different block → set as stack target (selected)
+  if(sim.holding&&b!==sim.holding){sim.selected=b;renderSim();simLogMsg(`Target set to ${b} — press STACK to place ${sim.holding} on ${b}`,'info');return;}
+  sim.selected=(sim.selected===b)?null:b;
+  renderSim();
+}
+function simLogMsg(msg,type){
+  const l=document.getElementById('sim-log');if(!l)return;
+  const colors={success:'var(--green)',error:'var(--red)',info:'var(--accent)'};
+  l.innerHTML=`<span style="color:${colors[type]||'var(--muted)'}">▶ ${msg}</span>`;
+}
+function simLog(msg){simLogMsg(msg,'info');}
+function isBlockClear(b){return!sim.blocks.some(x=>sim.pos[x]?.on===b);}
+function simPickup(){
+  if(!sim.selected){simLogMsg('Click a block first, then press PICKUP','error');return;}
+  if(sim.holding){simLogMsg(`You're already holding ${sim.holding} — PUTDOWN first!`,'error');return;}
+  const b=sim.selected;
+  if(sim.pos[b].on!=='table'){simLogMsg(`❌ ${b} is not on the table — try UNSTACK instead`,'error');return;}
+  if(!isBlockClear(b)){simLogMsg(`❌ ${b} is not clear — something is on top of it`,'error');return;}
+  sim.holding=b;sim.pos[b]={on:'held'};sim.selected=null;
+  simLogMsg(`✅ PICKUP(${b}) — Success! Now press PUTDOWN or select a target and STACK`,'success');renderSim();
+}
+function simPutdown(){
+  if(!sim.holding){simLogMsg('You are not holding anything — PICKUP a block first','error');return;}
+  const b=sim.holding;sim.pos[b]={on:'table'};sim.holding=null;sim.selected=null;
+  simLogMsg(`✅ PUTDOWN(${b}) — Success! ${b} is now on the table`,'success');renderSim();
+}
+function simStack(){
+  if(!sim.holding){simLogMsg('You must be holding a block first — press PICKUP or UNSTACK','error');return;}
+  const b=sim.holding;const t=sim.selected;
+  if(!t){simLogMsg(`Click a target block to stack ${b} onto, then press STACK`,'error');return;}
+  if(t===b){simLogMsg(`Can't stack ${b} on itself!`,'error');return;}
+  if(!isBlockClear(t)){simLogMsg(`❌ ${t} is not clear — something is on top of it`,'error');return;}
+  sim.pos[b]={on:t};sim.holding=null;sim.selected=null;
+  simLogMsg(`✅ STACK(${b},${t}) — Success! ${b} is now on top of ${t}`,'success');renderSim();
+}
+function simUnstack(){
+  if(sim.holding){simLogMsg(`You're already holding ${sim.holding} — PUTDOWN or STACK it first`,'error');return;}
+  const b=sim.selected;
+  if(!b){simLogMsg('Click the top block of a stack, then press UNSTACK','error');return;}
+  const on=sim.pos[b]?.on;
+  if(!on||on==='table'||on==='held'){simLogMsg(`❌ ${b} is already on the table — use PICKUP instead`,'error');return;}
+  if(!isBlockClear(b)){simLogMsg(`❌ ${b} is not clear — remove the block on top of it first`,'error');return;}
+  sim.holding=b;sim.pos[b]={on:'held'};sim.selected=null;
+  simLogMsg(`✅ UNSTACK(${b},${on}) — Success! Now PUTDOWN or STACK ${b}`,'success');renderSim();
+}
+
+// ── PRACTICE LESSON (after BFS / A*) ──
+const PRACTICE_PUZZLES={
+  easy:{
+    title:'BFS Practice: Stack A on B',
+    initial:[{label:'A',on:'table'},{label:'B',on:'table'}],
+    goal:[{label:'A',on:'B'},{label:'B',on:'table'}],
+    optimalMoves:2,blocks:['A','B'],
+    hint:['PICKUP(A)','STACK(A,B)'],
+    explanation:'BFS explores PICKUP(A) → STACK(A,B) in 2 moves — the shortest path!',
+  },
+  medium:{
+    title:'A* Practice: Reverse the Tower',
+    initial:[{label:'A',on:'C'},{label:'C',on:'B'},{label:'B',on:'table'}],
+    goal:[{label:'B',on:'A'},{label:'A',on:'table'},{label:'C',on:'table'}],
+    optimalMoves:5,blocks:['A','B','C'],
+    hint:['UNSTACK(A,C)','PUTDOWN(A)','UNSTACK(C,B)','PUTDOWN(C)','PICKUP(B)','STACK(B,A)'],
+    explanation:'A* uses h(n)=blocks not in goal. It picks UNSTACK(A,C) first (h drops by 1), then unwinds the tower optimally in 5 moves.',
+  },
+};
+let practiceMoves=[];let practiceIdx=null;
+function buildPracticeLesson(diff,lessonIdx){
+  const p=PRACTICE_PUZZLES[diff]||PRACTICE_PUZZLES.easy;
+  const diffLabel={easy:'🟢 Easy (BFS)',medium:'🟡 Medium (A*)'}[diff]||diff;
+  return`<div class="practice-box">
+    <div class="practice-header">
+      <div class="practice-title">🧩 ${p.title}</div>
+      <div class="practice-badge">${diffLabel}</div>
+    </div>
+    <div class="practice-states">
+      <div class="practice-state">
+        <div class="practice-state-lbl">📦 Initial State</div>
+        ${renderStateViz(p.initial)}
+      </div>
+      <div style="font-size:28px;color:var(--muted);text-align:center;animation:arrowPulse 1.5s ease-in-out infinite">→</div>
+      <div class="practice-state">
+        <div class="practice-state-lbl">🎯 Goal State</div>
+        ${renderStateViz(p.goal)}
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;padding:10px 14px;background:rgba(79,142,247,.05);border:1px solid rgba(79,142,247,.12);border-radius:9px">
+      <strong style="color:var(--accent)">Optimal:</strong> ${p.optimalMoves} moves · Try to match or beat it!
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:10px;align-items:flex-end">
+      <div><div style="font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Action</div>
+        <select class="sel-inp" id="pr-action-${lessonIdx}"><option value="STACK">STACK</option><option value="UNSTACK">UNSTACK</option><option value="PICKUP">PICKUP</option><option value="PUTDOWN">PUTDOWN</option></select></div>
+      <div><div style="font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Block A</div>
+        <select class="sel-inp" id="pr-ba-${lessonIdx}">${p.blocks.map(b=>`<option>${b}</option>`).join('')}</select></div>
+      <div><div style="font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Block B</div>
+        <select class="sel-inp" id="pr-bb-${lessonIdx}"><option>—</option>${p.blocks.map(b=>`<option>${b}</option>`).join('')}</select></div>
+      <button class="btn-move" onclick="prAddMove(${lessonIdx})">+ Add</button>
+    </div>
+    <div class="practice-moves">
+      <div class="practice-moves-lbl">
+        <span>My Moves</span>
+        <span id="pr-cnt-${lessonIdx}" style="color:var(--accent);font-family:var(--mono);font-weight:700">0 moves</span>
+      </div>
+      <div id="pr-items-${lessonIdx}"><div style="font-size:12px;color:var(--muted);text-align:center;padding:10px">No moves yet.</div></div>
+    </div>
+    <div id="pr-result-${lessonIdx}"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn-step" onclick="prClear(${lessonIdx})">🗑 Clear</button>
+      <button class="btn-step" onclick="prHint(${lessonIdx},'${diff}')">💡 Show Solution</button>
+      <button class="btn-step primary" style="flex:1" onclick="prCheck(${lessonIdx},'${diff}')">✅ Check My Answer</button>
+    </div>
+  </div>
+  <div class="step-btns">
+    <button class="btn-step" onclick="loadLesson(${lessonIdx-1})">← Prev</button>
+    <button class="btn-step primary" onclick="completeLesson(${lessonIdx})">Next Lesson →</button>
+  </div>`;
+}
+// Practice state management per lesson
+const prMoves={};
+function prAddMove(lid){
+  if(!prMoves[lid])prMoves[lid]=[];
+  const a=document.getElementById(`pr-action-${lid}`).value;
+  const ba=document.getElementById(`pr-ba-${lid}`).value;
+  const bb=document.getElementById(`pr-bb-${lid}`).value;
+  let m=a==='PICKUP'?`PICKUP(${ba})`:a==='PUTDOWN'?`PUTDOWN(${ba})`:`${a}(${ba},${bb})`;
+  prMoves[lid].push(m);prRenderMoves(lid);
+}
+function prRenderMoves(lid){
+  const moves=prMoves[lid]||[];
+  const cnt=document.getElementById(`pr-cnt-${lid}`);if(cnt)cnt.textContent=moves.length+' move'+(moves.length===1?'':'s');
+  const el=document.getElementById(`pr-items-${lid}`);if(!el)return;
+  el.innerHTML=moves.length?moves.map((m,i)=>`<div class="practice-move-item">
+    <div class="move-num">${i+1}</div><div class="move-text" style="font-family:var(--mono);font-size:12px;flex:1">${m}</div>
+    <div class="move-del" onclick="prMoves[${lid}].splice(${i},1);prRenderMoves(${lid})">×</div>
+  </div>`).join(''):'<div style="font-size:12px;color:var(--muted);text-align:center;padding:10px">No moves yet.</div>';
+}
+function prClear(lid){prMoves[lid]=[];prRenderMoves(lid);const r=document.getElementById(`pr-result-${lid}`);if(r)r.innerHTML='';}
+function prHint(lid,diff){
+  const p=PRACTICE_PUZZLES[diff];if(!p)return;
+  prMoves[lid]=[...p.hint];prRenderMoves(lid);
+  const r=document.getElementById(`pr-result-${lid}`);
+  if(r)r.innerHTML=`<div class="practice-result hint-shown">💡 <strong>Solution shown!</strong> ${p.explanation}</div>`;
+}
+function prCheck(lid,diff){
+  const p=PRACTICE_PUZZLES[diff];if(!p)return;
+  const moves=prMoves[lid]||[];
+  const r=document.getElementById(`pr-result-${lid}`);if(!r)return;
+  if(!moves.length){r.innerHTML=`<div class="practice-result" style="background:rgba(240,64,96,.06);border:1px solid rgba(240,64,96,.2);color:var(--red)">❌ Add some moves first!</div>`;return;}
+  // Check if move sequence matches optimal hint exactly or is a valid shorter/equal sequence
+  const matchesHint=JSON.stringify(moves)===JSON.stringify(p.hint);
+  const isOptimal=moves.length<=p.optimalMoves;
+  const isGood=moves.length<=p.optimalMoves+2;
+  if(matchesHint){
+    r.innerHTML=`<div class="practice-result success">🎉 <strong>Perfect!</strong> Your ${moves.length}-move solution matches the optimal BFS/A* path!<br><span style="font-size:12px;margin-top:4px;display:block;opacity:.8">${p.explanation}</span></div>`;
+  } else if(isOptimal){
+    r.innerHTML=`<div class="practice-result success">✅ <strong>Excellent!</strong> ${moves.length} moves — optimal or better! You're thinking like BFS/A*.<br><span style="font-size:12px;margin-top:4px;display:block;opacity:.8">${p.explanation}</span></div>`;
+  } else if(isGood){
+    r.innerHTML=`<div class="practice-result hint-shown">👍 <strong>Good effort!</strong> ${moves.length} moves — optimal is ${p.optimalMoves}. Try to reduce! Hint: ${p.hint.slice(0,2).join(' → ')}…</div>`;
+  } else {
+    r.innerHTML=`<div class="practice-result" style="background:rgba(240,64,96,.06);border:1px solid rgba(240,64,96,.2);color:var(--red)">🤔 <strong>Needs work.</strong> ${moves.length} moves used — optimal is ${p.optimalMoves}. Click 💡 Show Solution to see the BFS/A* path.</div>`;
+  }
+}
+
+// ── COMPETITION LEADERBOARD MODAL (organizer) ──
+function openCompLb(compId){
+  const comp=S.competitions.find(c=>c.id===compId);if(!comp)return;
+  const modal=document.getElementById('comp-lb-modal');
+  document.getElementById('clb-comp-name').textContent=`📊 ${comp.name} — Rankings`;
+  document.getElementById('clb-comp-meta').textContent=`${comp.diff.charAt(0).toUpperCase()+comp.diff.slice(1)} difficulty · ${comp.status==='live'?'🔴 LIVE now':'Status: '+comp.status}`;
+  // Get scores for this competition
+  const scores=S.allScores.filter(x=>x.compId===compId).sort((a,b)=>b.score-a.score);
+  const body=document.getElementById('clb-body');
+  if(!scores.length){
+    body.innerHTML='<div style="text-align:center;color:var(--muted);padding:28px;font-size:13px">No submissions yet for this competition.<br><span style="font-size:12px">Scores will appear here as students submit.</span></div>';
+  } else {
+    const maxScore=scores[0].score||1;
+    const rankColors=['#f59e0b','#9ca3af','#cd7f32'];
+    body.innerHTML=scores.map((s,i)=>{
+      const stu=S.students.find(x=>x.name===s.name);
+      const dept=stu?.dept||'';
+      return`<div class="clb-row ${i===0?'clb-me':''}" style="animation-delay:${i*.05}s">
+        <div class="clb-rank-badge" style="background:${i<3?rankColors[i]+'22':'var(--bg3)'};color:${i<3?rankColors[i]:'var(--muted)'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+        <div class="clb-info">
+          <div class="clb-name">${s.name}</div>
+          ${dept?`<div class="clb-dept">${dept}</div>`:''}
+          <div class="clb-bar-wrap"><div class="clb-bar" style="width:${Math.round((s.score/maxScore)*100)}%"></div></div>
+        </div>
+        <div class="clb-meta">
+          <div class="clb-score">${s.score} pts</div>
+          <div>${s.moves} mv · ${Math.floor(s.time/60)}m${(s.time%60).toString().padStart(2,'0')}s</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  modal.style.display='flex';
+  // Also listen for live updates if Firebase
+  if(S._fbOk&&comp.status==='live'){
+    listenLiveScores(compId,rows=>{
+      const liveScores=rows.sort((a,b)=>b.score-a.score);
+      if(!liveScores.length)return;
+      const maxS=liveScores[0].score||1;
+      const rankC=['#f59e0b','#9ca3af','#cd7f32'];
+      document.getElementById('clb-body').innerHTML=liveScores.map((s,i)=>{
+        const stu=S.students.find(x=>x.name===s.name);
+        const dept=stu?.dept||'';
+        return`<div class="clb-row" style="animation-delay:${i*.04}s">
+          <div class="clb-rank-badge" style="background:${i<3?rankC[i]+'22':'var(--bg3)'};color:${i<3?rankC[i]:'var(--muted)'}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+          <div class="clb-info"><div class="clb-name">${s.name}</div>${dept?`<div class="clb-dept">${dept}</div>`:''}
+          <div class="clb-bar-wrap"><div class="clb-bar" style="width:${Math.round((s.score/maxS)*100)}%"></div></div></div>
+          <div class="clb-meta"><div class="clb-score">${s.score} pts</div><div>${s.moves} mv</div></div>
+        </div>`;
+      }).join('');
+    });
+  }
+}
+function closeCompLbModal(){document.getElementById('comp-lb-modal').style.display='none';}
+// Close modal on overlay click
+document.getElementById('comp-lb-modal').addEventListener('click',function(e){if(e.target===this)closeCompLbModal();});
 
 // ── PUZZLES — Multiple variations per difficulty, seeded per student ──
 const PUZZLE_POOL={

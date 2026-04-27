@@ -1481,7 +1481,7 @@ function buildTeachAnim(type,idx){
   </div>
   <div class="step-btns" style="margin-top:16px">
     ${isBFS?`<button class="btn-step" onclick="loadLesson(2)">← Prev</button>`:`<button class="btn-step" onclick="loadLesson(3)">← Prev</button>`}
-    <button class="btn-step primary" onclick="completeLesson(${isBFS?3:4})">Got It, Next →</button>
+    <button class="btn-step primary" onclick="completeLesson(${idx})">Got It, Next →</button>
   </div>`;
 }
 
